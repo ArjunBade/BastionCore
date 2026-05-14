@@ -1,91 +1,57 @@
-//go:build windows
-// +build windows
-
 package main
 
 import (
-	"fmt"
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
-	"unsafe"
 
-	"golang.org/x/sys/windows"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"edr-core/pkg/api"
+	"edr-core/pkg/etw"
 )
 
-// getProcessMap returns a map of PID to process name by taking a snapshot
-// of all running processes using the Windows ToolHelp32 API
-func getProcessMap() (map[uint32]string, error) {
-	processes := make(map[uint32]string)
-
-	// Create a snapshot of all processes
-	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create snapshot: %w", err)
-	}
-	defer windows.CloseHandle(snapshot)
-
-	// Initialize process entry structure
-	pe := &windows.ProcessEntry32{
-		Size: uint32(unsafe.Sizeof(windows.ProcessEntry32{})),
-	}
-
-	// Get the first process in the snapshot
-	if err := windows.Process32First(snapshot, pe); err != nil {
-		return nil, fmt.Errorf("failed to get first process: %w", err)
-	}
-
-	// Add the first process to our map
-	processes[pe.ProcessID] = windows.UTF16ToString(pe.ExeFile[:])
-
-	// Iterate through all remaining processes
-	for {
-		if err := windows.Process32Next(snapshot, pe); err != nil {
-			// ERROR_NO_MORE_FILES indicates we've reached the end of the snapshot
-			if err == windows.ERROR_NO_MORE_FILES {
-				break
-			}
-			return nil, fmt.Errorf("failed to get next process: %w", err)
-		}
-		processes[pe.ProcessID] = windows.UTF16ToString(pe.ExeFile[:])
-	}
-
-	return processes, nil
-}
-
 func main() {
-	fmt.Println("=== EDR Agent Started - Process Monitoring ===")
-
-	var previousProcesses map[uint32]string
-	isFirstRun := true
-
-	// Create a ticker that fires every 1 second
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		// Get current list of running processes
-		currentProcesses, err := getProcessMap()
-		if err != nil {
-			fmt.Printf("Error getting process map: %v\n", err)
-			continue
-		}
-
-		// On first iteration, just populate the baseline without alerting
-		if isFirstRun {
-			previousProcesses = currentProcesses
-			fmt.Printf("[*] Initial baseline established: %d processes\n", len(previousProcesses))
-			isFirstRun = false
-			continue
-		}
-
-		// Compare current processes against previous snapshot
-		// Look for processes that exist now but didn't exist before
-		for pid, name := range currentProcesses {
-			if _, existed := previousProcesses[pid]; !existed {
-				fmt.Printf("[+] New process detected: %s (PID: %d)\n", name, pid)
-			}
-		}
-
-		// Update the baseline for the next iteration
-		previousProcesses = currentProcesses
+	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to dial server: %v", err)
 	}
+	defer conn.Close()
+
+	client := api.NewTelemetryClient(conn)
+
+	callback := func(pi etw.ProcessInfo) {
+		ev := &api.ProcessEvent{
+			Timestamp:       time.Now().UnixMilli(),
+			ProcessId:       pi.ProcessID,
+			ParentProcessId: pi.ParentProcessID,
+			ImagePath:       pi.ImageName,
+			CommandLine:     pi.CommandLine,
+			EventType:       "process_create",
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if _, err := client.SendEvent(ctx, ev); err != nil {
+			log.Printf("failed to send event: %v", err)
+		} else {
+			log.Printf("sent event pid=%d", pi.ProcessID)
+		}
+	}
+
+	if err := etw.StartWatching(callback); err != nil {
+		log.Fatalf("failed to start watcher: %v", err)
+	}
+
+	// wait for interrupt to exit
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	<-sigs
+
+	log.Println("shutting down agent")
 }

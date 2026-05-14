@@ -1,15 +1,22 @@
 syntax = "proto3";
+
 package api;
 
-// This tells the Protobuf compiler where to generate the Go code
 option go_package = "edr-core/pkg/api";
 
-// The main message the Agent will send to the Server
 message ProcessEvent {
-    int64 timestamp = 1;
-    uint32 process_id = 2;
-    uint32 parent_process_id = 3;
-    string image_path = 4;
-    string command_line = 5;
-    string event_type = 6; // e.g., "PROCESS_CREATE", "PROCESS_TERMINATE"
+  int64 timestamp = 1;
+  uint32 process_id = 2;
+  uint32 parent_process_id = 3;
+  string image_path = 4;
+  string command_line = 5;
+  string event_type = 6;
+}
+
+message EventResponse {
+  bool success = 1;
+}
+
+service Telemetry {
+  rpc SendEvent(ProcessEvent) returns (EventResponse);
 }
