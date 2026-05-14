@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"log"
 	"os"
 	"os/signal"
@@ -9,14 +11,37 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 
 	"edr-core/pkg/api"
 	"edr-core/pkg/etw"
 )
 
 func main() {
-	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Load CA cert to verify server certificate
+	caCert, err := os.ReadFile("certs/ca-cert.pem")
+	if err != nil {
+		log.Fatalf("failed to read CA cert: %v", err)
+	}
+	roots := x509.NewCertPool()
+	if ok := roots.AppendCertsFromPEM(caCert); !ok {
+		log.Fatalf("failed to append CA cert to pool")
+	}
+
+	// Load agent certificate and key to present to server
+	clientCert, err := tls.LoadX509KeyPair("certs/agent-cert.pem", "certs/agent-key.pem")
+	if err != nil {
+		log.Fatalf("failed to load client cert/key: %v", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{clientCert},
+		RootCAs:      roots,
+	}
+
+	creds := credentials.NewTLS(tlsConfig)
+
+	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Fatalf("failed to dial server: %v", err)
 	}
