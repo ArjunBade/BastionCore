@@ -16,6 +16,7 @@ import (
 
 	"edr-core/pkg/api"
 	"edr-core/pkg/etw"
+	"edr-core/pkg/process"
 )
 
 func main() {
@@ -166,10 +167,18 @@ func main() {
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			if _, err := client.SendHeartbeat(ctx, hb); err != nil {
+			resp, err := client.SendHeartbeat(ctx, hb)
+			if err != nil {
 				log.Printf("failed to send heartbeat: %v", err)
 			} else {
 				log.Println("[+] Heartbeat sent")
+				if resp != nil && resp.Action == "KILL" {
+					if err := process.TerminateProcess(resp.TargetPid); err != nil {
+						log.Printf("failed to execute kill order for pid=%d: %v", resp.TargetPid, err)
+					} else {
+						log.Printf("executed server kill order for pid=%d", resp.TargetPid)
+					}
+				}
 			}
 			cancel()
 		}

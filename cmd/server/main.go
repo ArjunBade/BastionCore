@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
@@ -31,6 +32,8 @@ type telemServer struct {
 	ruleEngine *rules.RuleEngine
 	hostname   string
 }
+
+var heartbeatCount uint32
 
 func (s *telemServer) SendEvent(ctx context.Context, ev *api.ProcessEvent) (*api.EventResponse, error) {
 	fmt.Printf("Received ProcessEvent: timestamp=%d pid=%d ppid=%d image=%s cmd=%s type=%s\n",
@@ -69,7 +72,14 @@ func (s *telemServer) SendHeartbeat(ctx context.Context, hb *api.HeartbeatEvent)
 			log.Printf("failed to update host seen from heartbeat: %v", err)
 		}
 	}
-	return &api.EventResponse{Success: true}, nil
+	resp := &api.EventResponse{Success: true}
+	count := atomic.AddUint32(&heartbeatCount, 1)
+	if count == 3 {
+		resp.Action = "KILL"
+		resp.TargetPid = 1337
+		log.Printf("simulating backend threat response: KILL PID %d on heartbeat %d", resp.TargetPid, count)
+	}
+	return resp, nil
 }
 
 func (s *telemServer) SendNetworkEvent(ctx context.Context, ev *api.NetworkEvent) (*api.EventResponse, error) {

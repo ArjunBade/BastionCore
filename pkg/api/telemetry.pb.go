@@ -108,6 +108,8 @@ func (x *ProcessEvent) GetEventType() string {
 type EventResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
+	TargetPid     uint32                 `protobuf:"varint,3,opt,name=target_pid,json=targetPid,proto3" json:"target_pid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -147,6 +149,20 @@ func (x *EventResponse) GetSuccess() bool {
 		return x.Success
 	}
 	return false
+}
+
+func (x *EventResponse) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *EventResponse) GetTargetPid() uint32 {
+	if x != nil {
+		return x.TargetPid
+	}
+	return 0
 }
 
 type HeartbeatEvent struct {
@@ -315,9 +331,12 @@ const file_pkg_api_telemetry_proto_rawDesc = "" +
 	"image_path\x18\x04 \x01(\tR\timagePath\x12!\n" +
 	"\fcommand_line\x18\x05 \x01(\tR\vcommandLine\x12\x1d\n" +
 	"\n" +
-	"event_type\x18\x06 \x01(\tR\teventType\")\n" +
+	"event_type\x18\x06 \x01(\tR\teventType\"`\n" +
 	"\rEventResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"a\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\x12\x1d\n" +
+	"\n" +
+	"target_pid\x18\x03 \x01(\rR\ttargetPid\"a\n" +
 	"\x0eHeartbeatEvent\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1c\n" +
