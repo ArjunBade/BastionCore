@@ -1,0 +1,25 @@
+nohup: ignoring input
+2026/05/14 05:45:07 gRPC server listening on :50051
+Received ProcessEvent: timestamp=1778737522112 pid=12101 ppid=3514 image=/usr/bin/fake_malware_2mc6bh cmd=--steal-creds --target 8i6pp5fs type=process_create
+Received ProcessEvent: timestamp=1778737525115 pid=5543 ppid=588 image=/usr/bin/fake_malware_3bfti9 cmd=--steal-creds --target 3xqxmtf4 type=process_create
+Received ProcessEvent: timestamp=1778737528116 pid=10799 ppid=2082 image=/usr/bin/fake_malware_cm7ouv cmd=--steal-creds --target tbw0kj20 type=process_create
+Received ProcessEvent: timestamp=1778737531117 pid=22057 ppid=3379 image=/usr/bin/fake_malware_dhkym4 cmd=--steal-creds --target 7tefpnqb type=process_create
+Received ProcessEvent: timestamp=1778737534118 pid=34100 ppid=2785 image=/usr/bin/fake_malware_762ebi cmd=--steal-creds --target irsunb0x type=process_create
+Received ProcessEvent: timestamp=1778737537119 pid=3542 ppid=491 image=/usr/bin/fake_malware_ye1it5 cmd=--steal-creds --target ik7is6ru type=process_create
+Received ProcessEvent: timestamp=1778737540120 pid=42346 ppid=2728 image=/usr/bin/fake_malware_7i6wuw cmd=--steal-creds --target elihd77l type=process_create
+Received ProcessEvent: timestamp=1778737543123 pid=6612 ppid=856 image=/usr/bin/fake_malware_frkp6t cmd=--steal-creds --target qn0e8616 type=process_create
+Received ProcessEvent: timestamp=1778737546125 pid=16674 ppid=3651 image=/usr/bin/fake_malware_bagvdi cmd=--steal-creds --target h60714wm type=process_create
+Received ProcessEvent: timestamp=1778737549128 pid=3533 ppid=4994 image=/usr/bin/fake_malware_0bksdn cmd=--steal-creds --target fgxui2l5 type=process_create
+Received ProcessEvent: timestamp=1778737552129 pid=27946 ppid=3997 image=/usr/bin/fake_malware_22r0qp cmd=--steal-creds --target 1hnk0wzc type=process_create
+Received ProcessEvent: timestamp=1778737555132 pid=30623 ppid=2127 image=/usr/bin/fake_malware_w9qntx cmd=--steal-creds --target 3h0ucgye type=process_create
+Received ProcessEvent: timestamp=1778737558134 pid=16290 ppid=4039 image=/usr/bin/fake_malware_0kymp3 cmd=--steal-creds --target yyn2v4tg type=process_create
+Received ProcessEvent: timestamp=1778737561136 pid=30593 ppid=627 image=/usr/bin/fake_malware_v6cjb4 cmd=--steal-creds --target h9ru3dqy type=process_create
+Received ProcessEvent: timestamp=1778737564139 pid=28918 ppid=4352 image=/usr/bin/fake_malware_byu8ao cmd=--steal-creds --target fc0ikoly type=process_create
+Received ProcessEvent: timestamp=1778737567140 pid=48037 ppid=127 image=/usr/bin/fake_malware_5gculj cmd=--steal-creds --target 59lmv1lx type=process_create
+Received ProcessEvent: timestamp=1778737570142 pid=19259 ppid=2936 image=/usr/bin/fake_malware_tvq939 cmd=--steal-creds --target 3idokoxp type=process_create
+Received ProcessEvent: timestamp=1778737573143 pid=9747 ppid=1295 image=/usr/bin/fake_malware_11x6u3 cmd=--steal-creds --target zblhzif7 type=process_create
+Received ProcessEvent: timestamp=1778737576144 pid=17936 ppid=1748 image=/usr/bin/fake_malware_cy7xva cmd=--steal-creds --target 8sjqc208 type=process_create
+Received ProcessEvent: timestamp=1778737579147 pid=33373 ppid=707 image=/usr/bin/fake_malware_zapmx5 cmd=--steal-creds --target qmcmgigg type=process_create
+Received ProcessEvent: timestamp=1778737582148 pid=39827 ppid=3739 image=/usr/bin/fake_malware_k153bg cmd=--steal-creds --target em9qn97w type=process_create
+Received ProcessEvent: timestamp=1778737585151 pid=6590 ppid=378 image=/usr/bin/fake_malware_1z3873 cmd=--steal-creds --target 7v5wiqmj type=process_create
+Received ProcessEvent: timestamp=1778737588153 pid=9229 ppid=537 image=/usr/bin/fake_malware_p1u4ec cmd=--steal-creds --target pe0q0bb4 type=process_create
