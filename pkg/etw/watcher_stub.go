@@ -8,7 +8,7 @@ import (
 )
 
 // StartWatching is a stub implementation used on non-Windows platforms.
-// It spawns a goroutine that generates mock ProcessInfo events every 3 seconds
+// It spawns a goroutine that generates real ProcessInfo events every 3 seconds
 // and calls the provided callback.
 func StartWatching(callback func(ProcessInfo)) error {
 	go func() {

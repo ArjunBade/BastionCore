@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -41,7 +42,12 @@ func main() {
 
 	creds := credentials.NewTLS(tlsConfig)
 
-	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(creds))
+	serverAddr := os.Getenv("SERVER_ADDR")
+	if serverAddr == "" {
+		serverAddr = "localhost:50051"
+	}
+
+	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Fatalf("failed to dial server: %v", err)
 	}
@@ -49,14 +55,27 @@ func main() {
 
 	client := api.NewTelemetryClient(conn)
 
+	// process start/terminate tracking
+	var mu sync.Mutex
+	seen := map[uint32]time.Time{}
+
 	callback := func(pi etw.ProcessInfo) {
+		mu.Lock()
+		_, existed := seen[pi.ProcessID]
+		seen[pi.ProcessID] = time.Now()
+		mu.Unlock()
+
 		ev := &api.ProcessEvent{
 			Timestamp:       time.Now().UnixMilli(),
 			ProcessId:       pi.ProcessID,
 			ParentProcessId: pi.ParentProcessID,
 			ImagePath:       pi.ImageName,
 			CommandLine:     pi.CommandLine,
-			EventType:       "process_create",
+			EventType:       "START",
+		}
+
+		if existed {
+			// already seen; send heartbeat-style update as START (keep simple)
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -65,7 +84,7 @@ func main() {
 		if _, err := client.SendEvent(ctx, ev); err != nil {
 			log.Printf("failed to send event: %v", err)
 		} else {
-			log.Printf("sent event pid=%d", pi.ProcessID)
+			log.Printf("sent START event pid=%d", pi.ProcessID)
 		}
 	}
 
@@ -73,14 +92,75 @@ func main() {
 		log.Fatalf("failed to start watcher: %v", err)
 	}
 
+	networkCallback := func(ni etw.NetworkInfo) {
+		ev := &api.NetworkEvent{
+			Timestamp:  time.Now().UnixMilli(),
+			ProcessId:  ni.ProcessID,
+			SourceIp:   ni.SourceIP,
+			SourcePort: ni.SourcePort,
+			DestIp:     ni.DestIP,
+			DestPort:   ni.DestPort,
+			Protocol:   ni.Protocol,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if _, err := client.SendNetworkEvent(ctx, ev); err != nil {
+			log.Printf("failed to send network event: %v", err)
+		} else {
+			log.Printf("sent network event pid=%d dest=%s:%d", ni.ProcessID, ni.DestIP, ni.DestPort)
+		}
+	}
+
+	go func() {
+		if err := etw.StartNetworkWatching(networkCallback); err != nil {
+			log.Printf("failed to start network watcher: %v", err)
+		}
+	}()
+
+	// background cleaner to emit TERMINATE when processes are not seen
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now()
+			mu.Lock()
+			for pid, last := range seen {
+				if now.Sub(last) > 8*time.Second {
+					// emit TERMINATE
+					tev := &api.ProcessEvent{
+						Timestamp:       time.Now().UnixMilli(),
+						ProcessId:       pid,
+						ParentProcessId: 0,
+						ImagePath:       "",
+						CommandLine:     "",
+						EventType:       "TERMINATE",
+					}
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					if _, err := client.SendEvent(ctx, tev); err != nil {
+						log.Printf("failed to send terminate for pid=%d: %v", pid, err)
+					} else {
+						log.Printf("sent TERMINATE event pid=%d", pid)
+					}
+					cancel()
+					delete(seen, pid)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
 	// heartbeat goroutine
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
+		hostname, _ := os.Hostname()
+
 		for range ticker.C {
 			hb := &api.HeartbeatEvent{
-				AgentId:   "agent-007",
+				AgentId:   hostname,
 				Status:    "ONLINE",
 				Timestamp: time.Now().UnixMilli(),
 			}

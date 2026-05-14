@@ -209,6 +209,98 @@ func (x *HeartbeatEvent) GetTimestamp() int64 {
 	return 0
 }
 
+type NetworkEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	ProcessId     uint32                 `protobuf:"varint,2,opt,name=process_id,json=processId,proto3" json:"process_id,omitempty"`
+	SourceIp      string                 `protobuf:"bytes,3,opt,name=source_ip,json=sourceIp,proto3" json:"source_ip,omitempty"`
+	SourcePort    uint32                 `protobuf:"varint,4,opt,name=source_port,json=sourcePort,proto3" json:"source_port,omitempty"`
+	DestIp        string                 `protobuf:"bytes,5,opt,name=dest_ip,json=destIp,proto3" json:"dest_ip,omitempty"`
+	DestPort      uint32                 `protobuf:"varint,6,opt,name=dest_port,json=destPort,proto3" json:"dest_port,omitempty"`
+	Protocol      string                 `protobuf:"bytes,7,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NetworkEvent) Reset() {
+	*x = NetworkEvent{}
+	mi := &file_pkg_api_telemetry_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NetworkEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NetworkEvent) ProtoMessage() {}
+
+func (x *NetworkEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_telemetry_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NetworkEvent.ProtoReflect.Descriptor instead.
+func (*NetworkEvent) Descriptor() ([]byte, []int) {
+	return file_pkg_api_telemetry_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *NetworkEvent) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *NetworkEvent) GetProcessId() uint32 {
+	if x != nil {
+		return x.ProcessId
+	}
+	return 0
+}
+
+func (x *NetworkEvent) GetSourceIp() string {
+	if x != nil {
+		return x.SourceIp
+	}
+	return ""
+}
+
+func (x *NetworkEvent) GetSourcePort() uint32 {
+	if x != nil {
+		return x.SourcePort
+	}
+	return 0
+}
+
+func (x *NetworkEvent) GetDestIp() string {
+	if x != nil {
+		return x.DestIp
+	}
+	return ""
+}
+
+func (x *NetworkEvent) GetDestPort() uint32 {
+	if x != nil {
+		return x.DestPort
+	}
+	return 0
+}
+
+func (x *NetworkEvent) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
 var File_pkg_api_telemetry_proto protoreflect.FileDescriptor
 
 const file_pkg_api_telemetry_proto_rawDesc = "" +
@@ -229,10 +321,21 @@ const file_pkg_api_telemetry_proto_rawDesc = "" +
 	"\x0eHeartbeatEvent\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\tR\aagentId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1c\n" +
-	"\ttimestamp\x18\x03 \x01(\x03R\ttimestamp2y\n" +
+	"\ttimestamp\x18\x03 \x01(\x03R\ttimestamp\"\xdb\x01\n" +
+	"\fNetworkEvent\x12\x1c\n" +
+	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12\x1d\n" +
+	"\n" +
+	"process_id\x18\x02 \x01(\rR\tprocessId\x12\x1b\n" +
+	"\tsource_ip\x18\x03 \x01(\tR\bsourceIp\x12\x1f\n" +
+	"\vsource_port\x18\x04 \x01(\rR\n" +
+	"sourcePort\x12\x17\n" +
+	"\adest_ip\x18\x05 \x01(\tR\x06destIp\x12\x1b\n" +
+	"\tdest_port\x18\x06 \x01(\rR\bdestPort\x12\x1a\n" +
+	"\bprotocol\x18\a \x01(\tR\bprotocol2\xb4\x01\n" +
 	"\tTelemetry\x122\n" +
 	"\tSendEvent\x12\x11.api.ProcessEvent\x1a\x12.api.EventResponse\x128\n" +
-	"\rSendHeartbeat\x12\x13.api.HeartbeatEvent\x1a\x12.api.EventResponseB\x12Z\x10edr-core/pkg/apib\x06proto3"
+	"\rSendHeartbeat\x12\x13.api.HeartbeatEvent\x1a\x12.api.EventResponse\x129\n" +
+	"\x10SendNetworkEvent\x12\x11.api.NetworkEvent\x1a\x12.api.EventResponseB\x12Z\x10edr-core/pkg/apib\x06proto3"
 
 var (
 	file_pkg_api_telemetry_proto_rawDescOnce sync.Once
@@ -246,19 +349,22 @@ func file_pkg_api_telemetry_proto_rawDescGZIP() []byte {
 	return file_pkg_api_telemetry_proto_rawDescData
 }
 
-var file_pkg_api_telemetry_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_pkg_api_telemetry_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_pkg_api_telemetry_proto_goTypes = []any{
 	(*ProcessEvent)(nil),   // 0: api.ProcessEvent
 	(*EventResponse)(nil),  // 1: api.EventResponse
 	(*HeartbeatEvent)(nil), // 2: api.HeartbeatEvent
+	(*NetworkEvent)(nil),   // 3: api.NetworkEvent
 }
 var file_pkg_api_telemetry_proto_depIdxs = []int32{
 	0, // 0: api.Telemetry.SendEvent:input_type -> api.ProcessEvent
 	2, // 1: api.Telemetry.SendHeartbeat:input_type -> api.HeartbeatEvent
-	1, // 2: api.Telemetry.SendEvent:output_type -> api.EventResponse
-	1, // 3: api.Telemetry.SendHeartbeat:output_type -> api.EventResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	3, // 2: api.Telemetry.SendNetworkEvent:input_type -> api.NetworkEvent
+	1, // 3: api.Telemetry.SendEvent:output_type -> api.EventResponse
+	1, // 4: api.Telemetry.SendHeartbeat:output_type -> api.EventResponse
+	1, // 5: api.Telemetry.SendNetworkEvent:output_type -> api.EventResponse
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -275,7 +381,7 @@ func file_pkg_api_telemetry_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_api_telemetry_proto_rawDesc), len(file_pkg_api_telemetry_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

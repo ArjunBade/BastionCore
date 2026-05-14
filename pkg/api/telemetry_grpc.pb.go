@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Telemetry_SendEvent_FullMethodName     = "/api.Telemetry/SendEvent"
-	Telemetry_SendHeartbeat_FullMethodName = "/api.Telemetry/SendHeartbeat"
+	Telemetry_SendEvent_FullMethodName        = "/api.Telemetry/SendEvent"
+	Telemetry_SendHeartbeat_FullMethodName    = "/api.Telemetry/SendHeartbeat"
+	Telemetry_SendNetworkEvent_FullMethodName = "/api.Telemetry/SendNetworkEvent"
 )
 
 // TelemetryClient is the client API for Telemetry service.
@@ -29,6 +30,7 @@ const (
 type TelemetryClient interface {
 	SendEvent(ctx context.Context, in *ProcessEvent, opts ...grpc.CallOption) (*EventResponse, error)
 	SendHeartbeat(ctx context.Context, in *HeartbeatEvent, opts ...grpc.CallOption) (*EventResponse, error)
+	SendNetworkEvent(ctx context.Context, in *NetworkEvent, opts ...grpc.CallOption) (*EventResponse, error)
 }
 
 type telemetryClient struct {
@@ -59,12 +61,23 @@ func (c *telemetryClient) SendHeartbeat(ctx context.Context, in *HeartbeatEvent,
 	return out, nil
 }
 
+func (c *telemetryClient) SendNetworkEvent(ctx context.Context, in *NetworkEvent, opts ...grpc.CallOption) (*EventResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EventResponse)
+	err := c.cc.Invoke(ctx, Telemetry_SendNetworkEvent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TelemetryServer is the server API for Telemetry service.
 // All implementations must embed UnimplementedTelemetryServer
 // for forward compatibility.
 type TelemetryServer interface {
 	SendEvent(context.Context, *ProcessEvent) (*EventResponse, error)
 	SendHeartbeat(context.Context, *HeartbeatEvent) (*EventResponse, error)
+	SendNetworkEvent(context.Context, *NetworkEvent) (*EventResponse, error)
 	mustEmbedUnimplementedTelemetryServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedTelemetryServer) SendEvent(context.Context, *ProcessEvent) (*
 }
 func (UnimplementedTelemetryServer) SendHeartbeat(context.Context, *HeartbeatEvent) (*EventResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendHeartbeat not implemented")
+}
+func (UnimplementedTelemetryServer) SendNetworkEvent(context.Context, *NetworkEvent) (*EventResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendNetworkEvent not implemented")
 }
 func (UnimplementedTelemetryServer) mustEmbedUnimplementedTelemetryServer() {}
 func (UnimplementedTelemetryServer) testEmbeddedByValue()                   {}
@@ -138,6 +154,24 @@ func _Telemetry_SendHeartbeat_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Telemetry_SendNetworkEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NetworkEvent)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TelemetryServer).SendNetworkEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Telemetry_SendNetworkEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TelemetryServer).SendNetworkEvent(ctx, req.(*NetworkEvent))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Telemetry_ServiceDesc is the grpc.ServiceDesc for Telemetry service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var Telemetry_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendHeartbeat",
 			Handler:    _Telemetry_SendHeartbeat_Handler,
+		},
+		{
+			MethodName: "SendNetworkEvent",
+			Handler:    _Telemetry_SendNetworkEvent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -7,3 +7,13 @@ type ProcessInfo struct {
 	ImageName       string
 	CommandLine     string
 }
+
+// NetworkInfo represents a simplified outbound network event.
+type NetworkInfo struct {
+	ProcessID  uint32
+	SourceIP   string
+	SourcePort uint32
+	DestIP     string
+	DestPort   uint32
+	Protocol   string
+}

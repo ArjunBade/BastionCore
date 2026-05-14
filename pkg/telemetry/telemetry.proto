@@ -1,0 +1,38 @@
+syntax = "proto3";
+package telemetry;
+option go_package = "edr-core/pkg/telemetry";
+
+message ProcessEvent {
+  int32 pid = 1;
+  int32 ppid = 2;
+  string executable = 3;
+  string command_line = 4;
+  string user = 5;
+  string action = 6;
+}
+
+message NetworkEvent {
+  int32 pid = 1;
+  string protocol = 2;
+  string local_ip = 3;
+  string remote_ip = 4;
+  int32 remote_port = 5;
+}
+
+message Event {
+  string hostname = 1;
+  int64 timestamp = 2;
+  oneof event_data {
+    ProcessEvent process = 3;
+    NetworkEvent network = 4;
+  }
+}
+
+message Response {
+  bool success = 1;
+  string message = 2;
+}
+
+service EDRService {
+  rpc StreamEvents(stream Event) returns (Response);
+}

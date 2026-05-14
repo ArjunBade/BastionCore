@@ -23,7 +23,18 @@ message HeartbeatEvent {
   int64 timestamp = 3;
 }
 
+message NetworkEvent {
+  int64 timestamp = 1;
+  uint32 process_id = 2;
+  string source_ip = 3;
+  uint32 source_port = 4;
+  string dest_ip = 5;
+  uint32 dest_port = 6;
+  string protocol = 7;
+}
+
 service Telemetry {
   rpc SendEvent(ProcessEvent) returns (EventResponse);
   rpc SendHeartbeat(HeartbeatEvent) returns (EventResponse);
+  rpc SendNetworkEvent(NetworkEvent) returns (EventResponse);
 }
