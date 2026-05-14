@@ -17,6 +17,13 @@ message EventResponse {
   bool success = 1;
 }
 
+message HeartbeatEvent {
+  string agent_id = 1;
+  string status = 2;
+  int64 timestamp = 3;
+}
+
 service Telemetry {
   rpc SendEvent(ProcessEvent) returns (EventResponse);
+  rpc SendHeartbeat(HeartbeatEvent) returns (EventResponse);
 }

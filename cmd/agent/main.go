@@ -73,6 +73,28 @@ func main() {
 		log.Fatalf("failed to start watcher: %v", err)
 	}
 
+	// heartbeat goroutine
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			hb := &api.HeartbeatEvent{
+				AgentId:   "agent-007",
+				Status:    "ONLINE",
+				Timestamp: time.Now().UnixMilli(),
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if _, err := client.SendHeartbeat(ctx, hb); err != nil {
+				log.Printf("failed to send heartbeat: %v", err)
+			} else {
+				log.Println("[+] Heartbeat sent")
+			}
+			cancel()
+		}
+	}()
+
 	// wait for interrupt to exit
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)

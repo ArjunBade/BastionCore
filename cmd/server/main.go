@@ -25,6 +25,11 @@ func (s *telemServer) SendEvent(ctx context.Context, ev *api.ProcessEvent) (*api
 	return &api.EventResponse{Success: true}, nil
 }
 
+func (s *telemServer) SendHeartbeat(ctx context.Context, hb *api.HeartbeatEvent) (*api.EventResponse, error) {
+	fmt.Printf("[💓] Heartbeat received from: %s\n", hb.AgentId)
+	return &api.EventResponse{Success: true}, nil
+}
+
 func main() {
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
