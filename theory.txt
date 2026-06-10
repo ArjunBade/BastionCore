@@ -1,0 +1,88 @@
+Here's the complete picture of how BastionCore works, structured the way you'd explain it to your manager.
+
+  What it is
+
+  BastionCore is a miniature EDR (Endpoint Detection & Response) system. The idea behind any EDR: put a lightweight agent on every machine you want to
+  protect, have it stream a live feed of what's happening (processes starting, network connections opening) to a central server, run that feed through a
+  detection engine that flags suspicious behavior, and give an operator a way to respond — like remotely killing a malicious process. BastionCore
+  implements that whole loop in Go.
+
+  The big picture
+
+   ENDPOINT                    CENTRAL SERVER                  OPERATOR / VIEW
+  ┌──────────┐   mTLS gRPC    ┌──────────────┐   SQL         ┌────────────┐
+  │  agent   │──────────────► │  gRPC :50051 │─────────────► │ ClickHouse │
+  │ (telemetry)               │  rule engine │               │  (storage) │
+  │          │                │  REST :8080  │               └─────┬──────┘
+  │ kill     │ ◄─── poll ──── │  (control)   │                     │
+  └──────────┘   REST         └──────────────┘               ┌─────▼──────┐
+                                     ▲                        │  Grafana   │
+                                     │ POST /kill             │ (dashboard)│
+                                     └──────── operator (curl)└────────────┘
+
+  Five moving parts: agent → server → rule engine → ClickHouse → Grafana, plus a REST control plane for the response action.
+
+  Component by component (following the data)
+
+  1. The agent (cmd/agent for real Windows, cmd/real_agent for the demo)
+  This is the sensor that lives on the endpoint. The real agent uses ETW (Event Tracing for Windows) — a built-in Windows facility that lets you subscribe
+  to a firehose of OS events — to watch every process start/stop and every network connection. Each event gets packaged and sent to the server. On
+  non-Windows machines (like your Codespaces), the ETW code compiles to stubs, which is why we use real_agent to simulate a realistic attack instead.
+
+  2. The transport: mTLS gRPC
+  The agent talks to the server over gRPC (a fast, typed RPC protocol using protobuf message definitions) secured with mutual TLS. "Mutual" is the
+  important word: not only does the agent verify it's talking to the real server, the server also demands the agent present a valid certificate signed by
+  the shared CA. An endpoint with no valid cert can't inject fake telemetry. The server even derives the machine's identity from the certificate's Common
+  Name (agent-01) rather than trusting a field in the message — so identity can't be spoofed.
+
+  3. The server (cmd/server)
+  Runs two listeners at once:
+  - gRPC on :50051 — receives the telemetry. For each process/network event it: stores it in ClickHouse, runs it through the rule engine, and updates the
+  host's "last seen" timestamp (a background job flips a host to OFFLINE after 30s of silence).
+  - REST on :8080 — the operator control plane (the kill API).
+  
+  4. The rule engine (pkg/rules/engine.go)
+  This is the "detection" brain. Every event that comes in gets checked against a set of behavioral rules. When one matches, it writes a row to the alerts
+  table. The rules it ships with:
+  - PowerShell launched with -EncodedCommand → HIGH (attackers hide payloads this way)
+  - Outbound connection to a known reverse-shell port like 4444 → HIGH
+  - net.exe usage, unexpected SYSTEM processes, cmd spawning PowerShell → MEDIUM/HIGH
+
+  The philosophy is behavioral detection — it's not matching file hashes of known malware, it's flagging suspicious patterns of activity, which catches
+  novel threats too.
+
+  5. ClickHouse (storage)
+  A column-oriented database built for huge volumes of time-stamped data — exactly what security telemetry is. Everything lands here: process_events,
+  network_events, alerts, hosts, response_commands.
+
+  6. Grafana (visualization)
+  Connects to ClickHouse and renders the SOC-style dashboard: live process feed, active alerts, severity breakdown, events-over-time, and online hosts.
+  This is the "single pane of glass" an analyst would watch.
+
+  The two flows that make it an EDR
+
+  Detection flow (the "D"):
+  Attack happens → agent sends events → server stores + evaluates → rule engine writes an alert → Grafana lights up. In your demo, real_agent plays a
+  scripted attack — cmd.exe spawns PowerShell with an encoded command, which connects out to a Tor C2 address on port 4444, then drops mimikatz — and two
+  HIGH alerts fire within seconds.
+
+  Response flow (the "R"):
+  An operator decides to act. They POST to /api/response/kill with a hostname and PID. The server records a PENDING command in response_commands. The
+  agent, on each heartbeat (every 10s), polls /api/response/pending, sees the order, executes the kill (TerminateProcess), and reports back EXECUTED. This
+  is a pull model — the agent reaches out for instructions rather than the server pushing to it, which is how real EDRs work because endpoints are often
+  behind firewalls/NAT and can't accept inbound connections.
+
+  Why the design choices matter (the talking points)
+
+  - mTLS everywhere → you can trust the telemetry and the commands; neither endpoint nor server can be impersonated.
+  - Identity from the certificate, not the payload → spoof-resistant.
+  - Behavioral rules, not signatures → catches unknown threats.
+  - Pull-based response → works through firewalls, scales, and the endpoint stays in control of execution.
+  - ClickHouse + Grafana → the same storage/visualization stack real security teams use, so it's a realistic architecture, just scaled down.
+
+  The honest framing for your manager
+
+  The infrastructure is real — real mTLS, real gRPC, real database, real rule engine, real dashboards. The only simulated piece is the endpoint itself:
+  since Codespaces isn't Windows and you're not going to run actual malware, real_agent generates a scripted attack that stands in for what a real ETW
+  agent would observe on a compromised Windows machine. That's an honest, defensible demo: "In production this sensor runs on real endpoints; here we're 
+  replaying a known attack pattern so you can watch the full detect-and-respond loop end to end."
