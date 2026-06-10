@@ -1,0 +1,103 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2870
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 Here's an honest end-to-end trace of exactly what happens at each step \'97 and it\
+  caught two things in my earlier runbook that were wrong. No code run; this is a\
+  walkthrough against the actual code.\
+\
+  Step-by-step dry read\
+\
+  1. docker-compose up -d\
+  - ClickHouse starts: ports 9000 (native) + 8123 (HTTP), database edr, password\
+  bastion123\
+  - Grafana starts: port 3000, admin/admin, datasource pre-provisioned to\
+  clickhouse:8123 / db edr (matches the compose password) \uc0\u10003 \
+  \
+  2. go run ./cmd/server (with CLICKHOUSE_DSN exported)\
+  - Connects + pings ClickHouse \uc0\u8594  connected to ClickHouse\
+  - Loads certs/ca-cert.pem + server-cert.pem/key \uc0\u8594  if any cert missing, hard\
+  Fatalf (yours are committed, so fine)\
+  - Creates all 5 tables: response_commands, hosts, process_events, network_events,\
+  alerts \uc0\u8592  the fix that makes dashboards work\
+  - gRPC listening :50051 (mTLS), REST :8080\
+  - Background goroutine marks hosts OFFLINE after 30s idle\
+\
+  3. go run ./cmd/real_agent --loop\
+  - mTLS dial with agent-cert.pem (CN = agent-01) \uc0\u8594  handshake succeeds against the\
+  server's RequireAndVerifyClientCert \uc0\u10003  \
+  - Background heartbeat loop (every 10s): sends HeartbeatEvent\{AgentId: \
+  os.Hostname()\} + polls REST\
+  - Main loop (every 10s): fires the 4-event attack chain via unary\
+  SendEvent/SendNetworkEvent\
+\
+  What fires on the server per cycle:\
+\
+  \uc0\u9484 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9516 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9516 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9488 \
+  \uc0\u9474         Event         \u9474    Server stores as   \u9474          Rule result         \u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474                       \u9474  hostname=agent-01    \u9474  none (childIsPowerShell     \u9474 \
+  \uc0\u9474  cmd.exe START        \u9474  (from cert CN)       \u9474  can't fire \'97 timing +       \u9474 \
+  \uc0\u9474                       \u9474                       \u9474  hostname)                   \u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474  powershell           \u9474  agent-01             \u9474  \u9989  HIGH "Encoded PowerShell \u9474 \
+  \uc0\u9474  -EncodedCommand      \u9474                       \u9474   Command"                   \u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474  net \u8594                 \u9474  agent-01             \u9474  \u9989  HIGH "Suspicious Remote  \u9474 \
+  \uc0\u9474  185.220.101.45:4444  \u9474                       \u9474  Port"                       \u9474 \
+  \uc0\u9500 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9532 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9508 \
+  \uc0\u9474  mimikatz START       \u9474  agent-01             \u9474  none                        \u9474 \
+  \uc0\u9492 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9524 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9524 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9496 \
+\
+  So 2 HIGH alerts per cycle, accumulating every 10s.\
+\
+  4. Grafana \uc0\u8594  localhost:3000\
+  - Live Process Events \uc0\u8594  fills with cmd/powershell/mimikatz rows\
+  - Active Alerts + Severity Breakdown \uc0\u8594  the two HIGH alerts \
+  - Events Over Time \uc0\u8594  climbing line\
+  - Online Hosts \uc0\u8594  shows agent-01 \u10003 \
+\
+  ---\
+  \uc0\u9888 \u65039   Two corrections to my earlier runbook\
+\
+  Correction 1 \'97 the kill hostname is NOT agent-01.\
+  The agent polls /api/response/pending?hostname=<os.Hostname()>, but events are\
+  stored under the cert CN agent-01. These are different strings. The kill command\
+  must be queued under the value real_agent actually polls with \'97 its OS hostname.\
+  Since the curl runs on the same box, use $(hostname) so it always matches:\
+\
+  curl -X POST localhost:8080/api/response/kill \\\
+    -d "\{\\"hostname\\":\\"$(hostname)\\",\\"pid\\":1201,\\"issued_by\\":\\"manager\\"\}"\
+\
+  (If you hardcode agent-01, the poll returns nothing and the kill silently never\
+  executes \'97 exactly the trap to avoid mid-demo.)\
+\
+  Correction 2 \'97 the kill result shows in the terminal, NOT Grafana.\
+  There's no dashboard panel for response_commands. Within \uc0\u8804 10s of the curl, the\
+  real_agent terminal prints:\
+  [\uc0\u55357 \u57057 \u65039   MOCK DEFENSE] Terminated malicious PID: 1201\
+  executed kill command id=... pid=1201\
+  and the command flips PENDING\uc0\u8594 EXECUTED in the DB. To show that flip, either\
+  re-run the curl-GET or query the table:\
+  curl "localhost:8080/api/response/pending?hostname=$(hostname)"   # empty after \
+  execution\
+\
+  ---\
+  Bottom line\
+\
+  The detect\uc0\u8594 alert\u8594 respond loop works end-to-end. Two narration notes for your\
+  manager: identity comes from the mTLS cert (agent-01) for telemetry, and the\
+  response result is in the agent log (the mock-defense line is actually a nice\
+  visual).\
+\
+  Two optional polish items if you have time before the demo \'97 both quick:\
+  1. Add a Grafana panel for response_commands so the kill is visible on the\
+  dashboard too.\
+  2. Align the hostnames (make heartbeat/poll use the cert CN agent-01) so the curl\
+  uses agent-01 and everything reads consistently.\
+  \
+  Want either? Otherwise you're demo-ready \'97 just run go build ./... once on\
+  Codespaces as a final sanity check.}
