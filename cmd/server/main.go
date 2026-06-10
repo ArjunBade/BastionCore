@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
@@ -32,8 +31,6 @@ type telemServer struct {
 	ruleEngine *rules.RuleEngine
 	hostname   string
 }
-
-var heartbeatCount uint32
 
 func (s *telemServer) SendEvent(ctx context.Context, ev *api.ProcessEvent) (*api.EventResponse, error) {
 	fmt.Printf("Received ProcessEvent: timestamp=%d pid=%d ppid=%d image=%s cmd=%s type=%s\n",
@@ -72,13 +69,9 @@ func (s *telemServer) SendHeartbeat(ctx context.Context, hb *api.HeartbeatEvent)
 			log.Printf("failed to update host seen from heartbeat: %v", err)
 		}
 	}
+	// Response actions are driven by the REST control plane
+	// (/api/response/kill) and polled by the agent, not synthesized here.
 	resp := &api.EventResponse{Success: true}
-	count := atomic.AddUint32(&heartbeatCount, 1)
-	if count == 3 {
-		resp.Action = "KILL"
-		resp.TargetPid = 1337
-		log.Printf("simulating backend threat response: KILL PID %d on heartbeat %d", resp.TargetPid, count)
-	}
 	return resp, nil
 }
 
@@ -194,6 +187,18 @@ func main() {
 
 		if err := ensureHostsTable(db); err != nil {
 			log.Printf("failed to ensure hosts table: %v", err)
+		}
+
+		if err := ensureProcessEventsTable(db); err != nil {
+			log.Printf("failed to ensure process_events table: %v", err)
+		}
+
+		if err := ensureNetworkEventsTable(db); err != nil {
+			log.Printf("failed to ensure network_events table: %v", err)
+		}
+
+		if err := ensureAlertsTable(db); err != nil {
+			log.Printf("failed to ensure alerts table: %v", err)
 		}
 
 		// background goroutine to mark hosts OFFLINE if no event in 30s
@@ -366,7 +371,7 @@ func main() {
 func insertProcessEvent(db *sql.DB, event rules.ProcessEvent) error {
 	_, err := db.Exec(
 		"INSERT INTO edr.process_events (timestamp, hostname, pid, ppid, executable, command_line, user, action) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		event.Timestamp,
+		time.UnixMilli(event.Timestamp),
 		event.Hostname,
 		event.PID,
 		event.PPID,
@@ -381,7 +386,7 @@ func insertProcessEvent(db *sql.DB, event rules.ProcessEvent) error {
 func insertNetworkEvent(db *sql.DB, event rules.NetworkEvent) error {
 	_, err := db.Exec(
 		"INSERT INTO edr.network_events (timestamp, hostname, pid, protocol, local_ip, remote_ip, remote_port) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		event.Timestamp,
+		time.UnixMilli(event.Timestamp),
 		event.Hostname,
 		event.PID,
 		event.Protocol,
@@ -445,6 +450,48 @@ func ensureHostsTable(db *sql.DB) error {
 		last_seen DateTime,
 		status String
 	) ENGINE = MergeTree() ORDER BY (hostname)`
+	_, err := db.Exec(ddl)
+	return err
+}
+
+func ensureProcessEventsTable(db *sql.DB) error {
+	ddl := `CREATE TABLE IF NOT EXISTS edr.process_events (
+		timestamp DateTime64(3),
+		hostname String,
+		pid UInt32,
+		ppid UInt32,
+		executable String,
+		command_line String,
+		user String,
+		action String
+	) ENGINE = MergeTree() ORDER BY (timestamp)`
+	_, err := db.Exec(ddl)
+	return err
+}
+
+func ensureNetworkEventsTable(db *sql.DB) error {
+	ddl := `CREATE TABLE IF NOT EXISTS edr.network_events (
+		timestamp DateTime64(3),
+		hostname String,
+		pid UInt32,
+		protocol String,
+		local_ip String,
+		remote_ip String,
+		remote_port UInt32
+	) ENGINE = MergeTree() ORDER BY (timestamp)`
+	_, err := db.Exec(ddl)
+	return err
+}
+
+func ensureAlertsTable(db *sql.DB) error {
+	ddl := `CREATE TABLE IF NOT EXISTS edr.alerts (
+		timestamp DateTime64(3),
+		hostname String,
+		severity String,
+		source String,
+		title String,
+		description String
+	) ENGINE = MergeTree() ORDER BY (timestamp)`
 	_, err := db.Exec(ddl)
 	return err
 }

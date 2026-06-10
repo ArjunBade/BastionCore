@@ -1,0 +1,35 @@
+# Compiled binaries / build output
+mock_agent
+agent
+server
+real_agent
+/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go test / coverage artifacts
+*.test
+*.out
+coverage.*
+
+# Runtime / process files
+server.log
+server.pid
+*.log
+
+# TLS material — generate locally per the README, never commit
+certs/*.pem
+certs/*.srl
+certs/*.csr
+certs/*.key
+
+# Local env / secrets
+.env
+.env.local
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store

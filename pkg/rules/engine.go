@@ -122,7 +122,7 @@ func (re *RuleEngine) insertAlert(hostname, severity, title, description string)
 
 	_, _ = re.db.Exec(
 		"INSERT INTO edr.alerts (timestamp, hostname, severity, source, title, description) VALUES (?, ?, ?, ?, ?, ?)",
-		time.Now().UnixMilli(),
+		time.Now(),
 		hostname,
 		severity,
 		"rule_engine",

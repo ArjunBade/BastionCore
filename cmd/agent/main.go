@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"sync"
@@ -18,6 +23,59 @@ import (
 	"edr-core/pkg/etw"
 	"edr-core/pkg/process"
 )
+
+// pendingCommand mirrors the JSON returned by GET /api/response/pending.
+type pendingCommand struct {
+	ID        string `json:"id"`
+	Action    string `json:"action"`
+	TargetPID int32  `json:"target_pid"`
+}
+
+// pollResponseCommands fetches and executes any pending response commands
+// queued for this host via the server's REST control plane.
+func pollResponseCommands(restAddr, hostname string) {
+	endpoint := fmt.Sprintf("%s/api/response/pending?hostname=%s", restAddr, url.QueryEscape(hostname))
+	resp, err := http.Get(endpoint)
+	if err != nil {
+		log.Printf("failed to poll pending commands: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	var cmds []pendingCommand
+	if err := json.NewDecoder(resp.Body).Decode(&cmds); err != nil {
+		log.Printf("failed to decode pending commands: %v", err)
+		return
+	}
+
+	for _, c := range cmds {
+		if c.Action != "KILL_PID" {
+			continue
+		}
+		status := "EXECUTED"
+		if err := process.TerminateProcess(uint32(c.TargetPID)); err != nil {
+			log.Printf("failed to execute kill command id=%s pid=%d: %v", c.ID, c.TargetPID, err)
+			status = "FAILED"
+		} else {
+			log.Printf("executed kill command id=%s pid=%d", c.ID, c.TargetPID)
+		}
+		reportCommandComplete(restAddr, c.ID, status)
+	}
+}
+
+// reportCommandComplete marks a response command as EXECUTED or FAILED.
+func reportCommandComplete(restAddr, id, status string) {
+	body, _ := json.Marshal(map[string]string{"id": id, "status": status})
+	resp, err := http.Post(restAddr+"/api/response/complete", "application/json", bytes.NewReader(body))
+	if err != nil {
+		log.Printf("failed to report command completion id=%s: %v", id, err)
+		return
+	}
+	resp.Body.Close()
+}
 
 func main() {
 	// Load CA cert to verify server certificate
@@ -159,6 +217,11 @@ func main() {
 
 		hostname, _ := os.Hostname()
 
+		restAddr := os.Getenv("REST_ADDR")
+		if restAddr == "" {
+			restAddr = "http://localhost:8080"
+		}
+
 		for range ticker.C {
 			hb := &api.HeartbeatEvent{
 				AgentId:   hostname,
@@ -167,20 +230,15 @@ func main() {
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			resp, err := client.SendHeartbeat(ctx, hb)
-			if err != nil {
+			if _, err := client.SendHeartbeat(ctx, hb); err != nil {
 				log.Printf("failed to send heartbeat: %v", err)
 			} else {
 				log.Println("[+] Heartbeat sent")
-				if resp != nil && resp.Action == "KILL" {
-					if err := process.TerminateProcess(resp.TargetPid); err != nil {
-						log.Printf("failed to execute kill order for pid=%d: %v", resp.TargetPid, err)
-					} else {
-						log.Printf("executed server kill order for pid=%d", resp.TargetPid)
-					}
-				}
 			}
 			cancel()
+
+			// Poll the REST control plane for queued response commands.
+			pollResponseCommands(restAddr, hostname)
 		}
 	}()
 
