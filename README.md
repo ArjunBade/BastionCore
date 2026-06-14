@@ -67,7 +67,6 @@ How to Run
 
 Screenshots
 -----------
-(placeholder for demo screenshots)
 
 Future Work
 -----------
@@ -89,7 +88,3 @@ openssl genrsa -out certs/agent-key.pem 2048
 openssl req -new -key certs/agent-key.pem -out certs/agent.csr -subj "/CN=agent-01"
 openssl x509 -req -in certs/agent.csr -CA certs/ca-cert.pem -CAkey certs/ca-key.pem -CAcreateserial -out certs/agent-cert.pem -days 365 -sha256
 
-Notes
------
-- For presentation/demo, use the self-signed CA to generate both server and client certs so mTLS works in the Codespace.
-- The project is intentionally minimal; consider adding authentication and hardened network rules before production.
